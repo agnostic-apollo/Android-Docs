@@ -7,6 +7,11 @@ Welcome to documentation for random stuff related to the [Android](https://www.a
 ## Apps
 
 
+### Config
+
+- [hasFragileUserData](apps/config/hasfragileuserdata.md)
+
+
 ### Processes
 
 - [Phantom, Cached And Empty Processes](apps/processes/phantom-cached-and-empty-processes.md)
