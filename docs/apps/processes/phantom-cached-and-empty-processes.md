@@ -1,10 +1,16 @@
 # Phantom, Cached And Empty Processes
 
-This was originally posted in a comment in [`termux/termux-app` issue `#2366`](https://github.com/termux/termux-app/issues/2366#issuecomment-961305970) and references info in relation to it, its comments and the original issue creator (OP/@V-no-A) and termux maintainer @xeffyr. An additional issue has been opened at google's `issuetracker` at https://issuetracker.google.com/u/1/issues/205156966 since the phantom process and excessive cpu usage killing changes silently introduced in Android `12` break lot of multiple apps, including **core functionality** of [Termux](https://github.com/termux/termux-app) and [Tasker](https://tasker.joaoapps.com) and other automation apps. This will be updated as things move on.
+This was originally posted in a comment in [`termux/termux-app` issue `#2366`](https://github.com/termux/termux-app/issues/2366#issuecomment-961305970) references info in relation to it, its comments and the original issue creator (OP/@V-no-A) and then posted at https://gist.github.com/agnostic-apollo/dc7e47991c512755ff26bd2d31e72ca8.
+
+An additional issue was opened at google's `issuetracker` at https://issuetracker.google.com/issues/205156966 since the phantom process and excessive cpu usage killing changes were silently introduced in Android `12` breaking lot of multiple apps, including **core functionality** of [Termux](https://github.com/termux/termux-app) and [Tasker](https://tasker.joaoapps.com) and other automation apps.
+
+Google was asked for an option to disable such killing and a **huge thanks to Jing Ji** for adding the `settings_enable_monitor_phantom_procs` settings flag with [`09dcdad`](https://cs.android.com/android/_/android/platform/frameworks/base/+/09dcdad5ebc159861920f090e07da60fac71ac0a) to allow disabling both phantom process and excessive cpu usage, which is available since Android `12L beta 3`. Check [comment 27](https://issuetracker.google.com/issues/205156966#comment27) and [comment 54](https://issuetracker.google.com/issues/205156966#comment54). Check [How to disable the phantom processes killing?](#how-to-disable-the-phantom-processes-killing) for details on how to disable the killing on different android versions.
 
 
 
-### Contents
+
+
+## Contents
 - [Phantom Processes](#phantom-processes)
   - [What are phantom process?](#what-are-phantom-processes)
   - [Which apps will this affect?](#which-apps-will-this-affect)
@@ -17,7 +23,7 @@ This was originally posted in a comment in [`termux/termux-app` issue `#2366`](h
   - [How to detect phantom processes that were killed?](#how-to-detect-phantom-processes-that-were-killed)
   - [How phantom process killing gets scheduled?](#how-phantom-process-killing-gets-scheduled)
   - [How to disable the phantom processes killing?](#how-to-disable-the-phantom-processes-killing)
-    - [Disable phantom process killing (TLDR)](#disable-phantom-process-killing)
+    - [Commands to disable phantom process killing and TLDR](#commands-to-disable-phantom-process-killing-and-tldr)
     - [Re-enable device config sync](#re-enable-device-config-sync)
     - [Check if device config sync is currently disabled](#check-if-device-config-sync-is-currently-disabled)
     - [Check device config sync mode stored in settings.](#check-device-config-sync-mode-stored-in-settings)
@@ -38,12 +44,16 @@ This was originally posted in a comment in [`termux/termux-app` issue `#2366`](h
     - [Pixel Devices](#Pixel-Devices)
   - [How to increase amount of cached and empty processes kept?](#how-to-increase-amount-of-cached-and-empty-processes-kept)
 - [`device_config` command](#device_config-command)
-- [Xeffyr's magical or broken device](#xeffyrs-magical-or-broken-device)
-##
-&nbsp;&nbsp;
+
+---
+
+&nbsp;
 
 
-## Phantom Processes
+
+
+
+# Phantom Processes
 
 Android 12 via [`15755084`](https://cs.android.com/android/_/android/platform/frameworks/base/+/157550849f0430181fa53c8e1b63112c59c6937b) and updated via [`5706277f`](https://cs.android.com/android/_/android/platform/frameworks/base/+/5706277f2d43d5be20a5510d1fb87a53c901ed52) has added the mechanism to monitor forked child processes started by apps and kills them if more than the default `32` are found running.
 
@@ -66,25 +76,32 @@ Check `PhantomProcessList` commit history [here](https://cs.android.com/android/
 This change is neither listed in android `12` [changes list](https://developer.android.com/about/versions/12/summary) nor [behavior changes](https://developer.android.com/about/versions/12/behavior-changes-all) and was done silently.
 
 They were named "Phantom" because they were designed to give android devs nightmares when then saw them (allegedly of course).
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
-### What are phantom processes?
+## What are phantom processes?
 
 So now what are phantom processes from the perspective of android. It's any process that has been forked from the main `app` process and is now either a child of the `app` process or of `init` process. This can be done in the following ways.
 
 
 
-#### `Runtime.exec()`
+### `Runtime.exec()`
 
 The [`Runtime.exec()`](https://developer.android.com/reference/java/lang/Runtime#exec(java.lang.String[],%20java.lang.String[])) is the `Java` API that can be used to `fork` a child processes. The parent of the child process will be the `app` process itself.
 
-Termux uses this for running background [`TermuxTasks`](https://github.com/termux/termux-app/blob/v0.117/termux-shared/src/main/java/com/termux/shared/shell/TermuxTask.java#L93) (in `termux-app` `v0.109-0.117`) and are managed by the foreground [`TermuxService`](https://github.com/termux/termux-app/blob/v0.117/app/src/main/java/com/termux/app/TermuxService.java#L86). These background tasks can be sent via the [`RUN_COMMAND Intent`](https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent) and by termux plugins like [`termux-boot`](https://github.com/termux/termux-boot), [`termux-tasker`](https://github.com/termux/termux-tasker) and [`termux-widget`](https://github.com/termux/termux-widget). They show as `<n> tasks` in the `Termux` notification.
+Termux uses this for running background [`TermuxTasks`](https://github.com/termux/termux-app/blob/v0.117/termux-shared/src/main/java/com/termux/shared/shell/TermuxTask.java#L93) (in `termux-app` `v0.109-0.118.0`) and are managed by the foreground [`TermuxService`](https://github.com/termux/termux-app/blob/v0.117/app/src/main/java/com/termux/app/TermuxService.java#L86). These background tasks can be sent via the [`RUN_COMMAND Intent`](https://github.com/termux/termux-app/wiki/RUN_COMMAND-Intent) and by termux plugins like [`termux-boot`](https://github.com/termux/termux-boot), [`termux-tasker`](https://github.com/termux/termux-tasker) and [`termux-widget`](https://github.com/termux/termux-widget). They show as `<n> tasks` in the `Termux` notification.
 
 
 
-#### `execvp`
+[`Runtime.exec()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:libcore/ojluni/src/main/java/java/lang/Runtime.java;l=694) -> [`ProcessBuilder.start()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:libcore/ojluni/src/main/java/java/lang/ProcessBuilder.java;l=1029) -> [`ProcessImpl.start()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:libcore/ojluni/src/main/java/java/lang/ProcessImpl.java;l=137) -> [`UNIXProcess()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:libcore/ojluni/src/main/java/java/lang/UNIXProcess.java;l=133) -> [`UNIXProcess_md.forkAndExec()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:libcore/ojluni/src/main/native/UNIXProcess_md.c;l=926) -> [`UNIXProcess_md.startChild()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:libcore/ojluni/src/main/native/UNIXProcess_md.c;l=847) ([note on forking](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:libcore/ojluni/src/main/native/UNIXProcess_md.c;l=68) for [`clone()`](https://manpages.debian.org/testing/manpages-dev/clone.2.en.html), [`vfork()`](https://manpages.debian.org/testing/manpages-dev/vfork.2.en.html) and [`fork()`](https://manpages.debian.org/testing/manpages-dev/fork.2.en.html) usage) -> [`UNIXProcess_md.childProcess()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:libcore/ojluni/src/main/native/UNIXProcess_md.c;l=782) -> [`UNIXProcess_md.JDK_execvpe()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:libcore/ojluni/src/main/native/UNIXProcess_md.c;l=603) -> [`exec.execvpe()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r32:bionic/libc/bionic/exec.cpp;l=119)
+
+
+### `execvp`
 
 The [`execvp`](https://manpages.debian.org/stretch/manpages-dev/execvp.3.en.html) is part of the native `exec()` family of functions that replaces the current process image with a new process image. This can be called by the child process that has been spawned from the `app` process after it called [`fork()`](https://manpages.debian.org/stretch/manpages-dev/fork.2.en.html). These functions can be called in `JNI` in native `c/c++` code.
 
@@ -92,18 +109,22 @@ Termux uses this to start the foreground [`TermuxSessions`](https://github.com/t
 
 
 
-#### `daemon`
+### `daemon`
 
 The [`daemon()`](https://manpages.debian.org/bullseye/manpages-dev/daemon.3.en.html) function is for programs wishing to detach themselves from the controlling terminal and run in the background as [system daemons](https://manpages.debian.org/bullseye/systemd/daemon.7.en.html). The child process forked from the parent process basically detaches itself from the parent so that it is no longer its parent process (`ppid`) and is inherited by the `init` (`pid` `1`) process.
 
 Termux provides commands like `sshd` and `crond` to start daemon processes. If `sshd` command is run, the `ps` output will show `sshd` to have `init` (`pid` `1`) as the `ppid`, instead of `pid` of its original parent `bash`. These have a higher chance of getting killed since there are no longer attached to the `app` process. You can optionally [not daemonize](https://github.com/termux/termux-app/issues/2015#issuecomment-860492160) `sshd` and just run it in the background and it will then still be tied to `app` process and less likely to get killed, like with `sshd -D`.
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### Which apps will this affect?
+## Which apps will this affect?
 
 This will majorly affect all apps that fork child processes from their app process, like with `Runtime.exec()` or in `JNI`.  
 
@@ -112,13 +133,17 @@ For Termux app, this killing will affect all commands runs in the `shell`, which
 For Tasker, this will affect `Run Shell`, `Adb Wifi` and some other actions that run `shell` commands internally, and also the `Logcat Entry` event profile.
 
 Expect such processes to be killed at any time if using Android `12`.
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-#### Phantom process bookkeeping
+### Phantom process bookkeeping
 
 `3` commands were started below by `Termux` and `dumpsys activity processes` output shows all `3` being bookkeeped and open for killing by `PhantomProcessList`. You can trigger an update for bookkeeping/killing by connecting or disconnecting the charger, as per `Battery power changes` mentioned in [`How phantom process killing gets scheduled?`](#How-phantom-process-killing-gets-scheduled) section below.
 
@@ -159,15 +184,19 @@ $ adb shell "/system/bin/dumpsys activity processes -a"
       user #0 uid=10147 pid=6704 ppid=3451 knownSince=-1s600ms killed=false
       lastCpuTime=0 oom adj=0 seq=11
 ```
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How are phantom processes killed?
+## How are phantom processes killed?
 
-#### Excessive CPU
+### Excessive CPU
 
 The [`ActivityManagerService.updateAppProcessCpuTimeLPr()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java;l=14274) and [`ActivityManagerService.updatePhantomProcessCpuTimeLPr()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java;l=14302) handles the killing of app and phantom processes which use excessive CPU respectively. The `logcat` will have `Killing...` entries with `excessive cpu` reason if a process is killed.
 
@@ -177,7 +206,7 @@ I am not currently aware of how app CPU usage works when running in an emulator.
 
 
 
-#### Max Phantom Processes
+### Max Phantom Processes
 
 The [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=416) handles the killing of phantom processes greater than [`max_phantom_processes`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=172), which defaults to [`DEFAULT_MAX_PHANTOM_PROCESSES = 32`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=150). The limit applies to **all apps combined** and not `32` processes per app.
 
@@ -243,13 +272,17 @@ void trimPhantomProcessesIfNecessary() {
 }
 
 ```
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How to check max phantom processes that are allowed to run?
+## How to check max phantom processes that are allowed to run?
 
 #### Check current value of `max_phantom_processes` being used by `ActivityManagerConstants`.
 
@@ -277,17 +310,21 @@ The value returned by the command will be `null` by default if not set with `dev
 $ adb shell "/system/bin/device_config get activity_manager max_phantom_processes"
 null
 ```
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How to check phantom processes running that are being monitored by `PhantomProcessList`?
+## How to check phantom processes running that are being monitored by `PhantomProcessList`?
 
 The `dumpsys activity processes` [dump](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java;l=9358) shows the monitored phantom processes under the [`All Active App Child Processes` and `All Zombie App Child Processes`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=559) sections. The sections won't be shown if no processes are being monitored. Processes might be running, but still not show since they may not have yet have been detected by ` PhantomProcessList`, but you can trigger an update by connecting or disconnecting the charger, or with other triggers mentioned in [`How phantom process killing gets scheduled?`](#How-phantom-process-killing-gets-scheduled) section below. Check [here](https://stackoverflow.com/questions/20688982/zombie-process-vs-orphan-process) for info on zombie processes.
 
-The `-a` flag minimizes the output.
+The `-a` flag minimizes the output. Don't pass on Android `13`.
 
   - `root`: `su -c "/system/bin/dumpsys activity processes -a"`
   - `adb`:  `adb shell "/system/bin/dumpsys activity processes -a"`
@@ -326,13 +363,17 @@ then run
 ```
 /system/bin/dumpsys activity processes -a
 ```
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How to detect phantom processes that were killed?
+## How to detect phantom processes that were killed?
 
 To get which processes are currently running in your app, run `ps -efww` and you should be able to get their `pid` and full `commandline`. Note down the `pid` values for later use.
 
@@ -367,13 +408,17 @@ I ActivityManager: Process PhantomProcessRecord {9ccd0ab 5683:5641:bash/u0a147} 
 ```
 
 The `Killing PhantomProcessRecord...` entry is generated by [`PhantomProcessRecord.killLocked()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessRecord.java;l=114), with the reason `Trimming phantom processes` passed by [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=454).
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How phantom process killing gets scheduled?
+## How phantom process killing gets scheduled?
 
 The *culling* of phantom processes gets scheduled via [`PhantomProcessList.scheduleTrimPhantomProcessesLocked()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=409) which gets called when a new `PhantomProcessRecord` is found/created in [`PhantomProcessList.getOrCreatePhantomProcessIfNeededLocked()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=350), which gets called by [`PhantomProcessList.updateProcessCpuStatesLocked()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=533), which is called by [`AppProfiler.updateCpuStatsNow()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/AppProfiler.java;l=1834). The `updateCpuStatsNow()` is called from different places, like when:
 
@@ -387,102 +432,168 @@ The *culling* of phantom processes gets scheduled via [`PhantomProcessList.sched
 The `pss` collection of all processes is called when various oom adjustments are made by [`OomAdjuster`](https://cs.android.com/android/platform/superproject/+/master:frameworks/base/services/core/java/com/android/server/am/OomAdjuster.java;l=978) and may run every [`DEFAULT_FULL_PSS_LOWERED_INTERVAL(5 mins)`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=126) if under [low memory conditions](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/AppProfiler.java;l=998).
 
 So based on `battery power changes`, one can trigger the *culling* by connecting or disconnecting the charger as well. So termux will get killed if more than `32` phantom processes are running by any app, including termux, depending on oom priority of course.
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How to disable the phantom processes killing?
+## How to disable the phantom processes killing?
 
-The [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=416) uses the [`max_phantom_processes`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=172) setting for the [`activity_manager`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/core/java/android/provider/DeviceConfig.java;l=67) namespace to decide how many processes to kill, which as mentioned defaults to `32`.
+### Android 12L, 13 and higher
 
-The `device_config` shell command can be used to change the default value. **It must be run with the `shell` (`adb`) or `root` user.** Check the [`device_config` command](#device_config-command) section below for more info on it.
+As per `settings_enable_monitor_phantom_procs` settings flag added in [`09dcdad`](https://cs.android.com/android/_/android/platform/frameworks/base/+/09dcdad5ebc159861920f090e07da60fac71ac0a), the [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=424) does not kill any **phantom processes** and [`ActivityManagerService.checkExcessivePowerUsage()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java;l=14281) does not kill any **processes using excessive cpu** if [`FeatureFlagUtils.SETTINGS_ENABLE_MONITOR_PHANTOM_PROCS`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/core/java/android/util/FeatureFlagUtils.java;l=58) is disabled, i.e its value is `false`.
+
+Check [Commands to disable phantom process killing and TLDR](#commands-to-disable-phantom-process-killing-and-tldr) section below for the command to disable the flag.
+
+&nbsp;
+
+
+
+### Android 12
+
+On Android 12, **no setting exists** that can be changed with `adb` or `root` to disable killing of **processes using excessive cpu**.
+
+However, the killing of **phantom processes** can be disabled. The [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=416) uses the [`max_phantom_processes`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=172) setting for the [`activity_manager`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/core/java/android/provider/DeviceConfig.java;l=67) namespace to decide how many processes to kill, which as mentioned defaults to `32`.
+
+Based on the `trimPhantomProcessesIfNecessary()` `for` loop in source code, the `max_phantom_processes` value can be set to [`Integer.MAX_VALUE` (`2147483647`)](https://docs.oracle.com/javase/7/docs/api/java/lang/Integer.html#MAX_VALUE) to disable the killing of phantom processes, since the outer `if (mService.mConstants.MAX_PHANTOM_PROCESSES < mPhantomProcesses.size())` condition will always fail.
+
+The `device_config` shell command can be used to change the default value as listed in the [Commands to disable phantom process killing and TLDR](#commands-to-disable-phantom-process-killing-and-tldr) section below. **It must be run with the `shell` (`adb`) or `root` user.** Check the [`device_config` command](#device_config-command) section below for more info on it.
 
 The `device_config` command calls [`DeviceConfigService`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/DeviceConfigService.java;l=270) to update the `max_phantom_processes` value, which triggers [`ActivityManagerConstants.updateMaxPhantomProcesses()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=1201) so that changes take effect.
 
 After boot up, the [`ActivityManagerConstants.loadDeviceConfigConstants()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=820) called during `start()` will also read all properties set for the `activity_manager` device config namespace and call their relevant update functions in a `for` loop as per [`c85bbe00`](https://cs.android.com/android/_/android/platform/frameworks/base/+/c85bbe003d7fde1f2c60a192002981bc9bed9f21), including `updateMaxPhantomProcesses()`.
 
-So based on the `trimPhantomProcessesIfNecessary()` `for` loop in source code, the `max_phantom_processes` value can be set to [`Integer.MAX_VALUE` (`2147483647`)](https://docs.oracle.com/javase/7/docs/api/java/lang/Integer.html#MAX_VALUE) to disable the killing of phantom processes, since the outer `if (mService.mConstants.MAX_PHANTOM_PROCESSES < mPhantomProcesses.size())` condition will always fail.
-
-OP has reported the following via email after running the `adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"` command.
-
->So far, Termux has been working as expected. I have ran a Python script multiple times in the last 24 hours for anywhere between 20 to 90 minutes at a time with no issues so far. Even just now looking through the antivirus app while running Termux hasn't caused it to get killed
-
->So far, the setting is still 2147483647
-
-So the setting is working as expected to disable the killing and I'm hoping google would still allow the "hack" in future and not disable it, unless they provide a non-adb way to bypass such restrictions for an app.
-
-However, on android (`11` and `12` emulator and `OP` device) after `3-4` mins have passed after device reboot and unlocked and after the `BOOT_COMPLETED` event is sent, all the settings for all namespaces, or at least `activity_manager` and `media` are reset and I only get following. Most namespaces don't have any properties set by default so I tested only `2`. Note that `BOOT_COMPLETED` event is not sent in `BFU` (before first unlock) state and lock screen needs to be unlocked for things to start and `BOOT_COMPLETED` will be sent after a few minutes after unlocking.
+However, devices that have  after `3-4` mins have passed after device reboot and unlocked and after the `BOOT_COMPLETED` event is sent, all the settings for all namespaces, or at least `activity_manager` and `media` are reset and I only get following. Most namespaces don't have any properties set by default so I tested only `2`. Note that `BOOT_COMPLETED` event is not sent in `BFU` (before first unlock) state and lock screen needs to be unlocked for things to start and `BOOT_COMPLETED` will be sent after a few minutes after unlocking.
 
 ```
-# Initial at boot
+# Initial value after reboot after setting value
 $ adb shell "/system/bin/device_config list activity_manager"
 max_phantom_processes=2147483647
 max_phantom_processes1=1
 push_messaging_over_quota_behavior=0
 
-# After few minutes
+# After few minutes of boot or whenever gms config update triggers 
 $ adb shell "/system/bin/device_config list activity_manager"
 push_messaging_over_quota_behavior=0
 ```
+
 &nbsp;
 
 
 
-#### Commands to disable phantom process killing and TLDR
+## Commands to disable phantom process killing and TLDR
 
-#### Disable phantom process killing.
+### Android 12L, 13 and higher
 
-1. **Run command on every boot** after at least `5` mins have passed or add a `Device Boot` (`BOOT_COMPLETED`) event in Tasker and run following commands after a `Wait` action of at least `1` min, so that android gets chance to reset the values. Since Tasker's `Logcat Entry` `logcat` process may itself get killed, so it likely can't be relied on to do this by matching for `logcat` entries triggered by android components on `BOOT_COMPLETED` event (chicken and egg problem).
+**Run commands once** to disable killing of **phantom processes** and **processes using excessive cpu**.
+
+  - `root`: `su -c "settings put global settings_enable_monitor_phantom_procs false"` or `su -c "setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs false"`
+  - `adb`: `adb shell "settings put global settings_enable_monitor_phantom_procs false"`
+
+Note that on debug android builds, like android virtual device Google API's releases, the setting can also be changed from `Android Settings` -> `System` -> `Developer Options` -> `Feature flags`. **On production devices, the `Feature flags` page will be empty.**
+
+&nbsp;
+
+Trying to run `setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs` with `adb` will [fail due to selinux restrictions](settings_enable_monitor_phantom_procs-with-adb.png) since a [sepolicy excemption](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:system/sepolicy/private/shell.te;l=149) does not exist for it like it does for other flags like [`settings_dynamic_system`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:system/sepolicy/private/property_contexts;l=71) used for [dynamic system updates](https://source.android.com/docs/core/ota/dynamic-system-updates#feature-flag). The [`FeatureFlagUtils.isEnabled()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/core/java/android/util/FeatureFlagUtils.java;l=94) gives priority to `settings` `global` value over `persist.sys.fflag`. Check https://twitter.com/MishaalRahman/status/1491487491026833413 and https://twitter.com/MishaalRahman/status/1491489385170227205
+
+&nbsp;
+
+
+
+### Android 12
+
+On Android 12, **no setting exists** that can be changed with `adb` or `root` to disable killing of **processes using excessive cpu** and users will have to manually limit the cpu usage of forked processes using commands like [`nice`/`cpulimit`](https://unix.stackexchange.com/questions/151883/limiting-processes-to-not-exceed-more-than-10-of-cpu-usage). A [xposed module](https://github.com/rovo89/XposedBridge/wiki/Development-tutorial) for **rooted users** that can be run with [`Magisk`](https://github.com/topjohnwu/Magisk) and [`LSPosed`](https://github.com/LSPosed/LSPosed) that hooks into [`ActivityManagerService.checkExcessivePowerUsage()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java;l=14237) to disable the killing is planned to be created.
+
+To disable killing of **phantom processes**, read on.
+
+If you have `com.google.android.gms` (google play services) installed on your device as system app, then it will overwrite all your config settings remotely on your device after `3-4` mins have passed after device boot up and screen unlocked and whenever gms config update comes, which may happen at any time of the day/week/month. To prevent that from happening you **must disable disable device config sync**, otherwise value will randomly reset and all excess phantom processes will immediately be killed.
+
+You can check if `gms` is installed on your device and has the permission to overwrite setting, run below commands. If `android.permission.WRITE_DEVICE_CONFIG: granted=true` is returned, then your settings should be overridden. Other OEMs or device manufacturers may also have similar system services to update settings, and you will need to disable device config sync for those cases as well.
+
+  - `root`: `su -c "/system/bin/dumpsys package com.google.android.gms | grep WRITE_DEVICE_CONFIG"`
+  - `adb`: `adb shell "/system/bin/dumpsys package com.google.android.gms | grep WRITE_DEVICE_CONFIG"`
+
+&nbsp;
+
+#### If gms or related services do not exist on the device
+
+Just set `max_phantom_processes` to `2147483647` to permanently disable killing of **phantom processes**.
 
   - `root`: `su -c "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
   - `adb`: `adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
-  - `Adb Wifi` or `Run Shell` action with `Use Root` toogle enabled: `/system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
+  - Tasker `Adb Wifi` or `Run Shell` action with `Use Root` toogle enabled: `/system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
 
 
-2. **Run commands once** and be done with it. By doing this you will disable device config syncing which prevents android from resetting values to default on reboots and crashes, and will also prevent `com.google.android.gms` (google play services) from overwriting all your config settings remotely on your device. Setting single values will still be allowed. **Use this at your own risk** and if you are willing to accept any known and unknown risks, like no recovery from boot loops, crashes and bad config values.
+#### If gms or related services do exist on the device
+
+Disable device config sync permanently and set `max_phantom_processes` to `2147483647` to permanently disable killing of **phantom processes**.
+
+**Use this at your own risk** and if you are willing to accept any known and unknown risks, like no recovery from boot loops, crashes and bad config values. Check `*device config sync*` and [Why device config may get reset?](#why-device-config-may-get-reset) sections below for more info. You can also run `/system/bin/device_config set_sync_disabled_for_tests until_reboot` to disable sync until next reboot, in which case you will need to run the commands on every reboot since `gms` will reset the config at boot.
 
   - `root`: `su -c "/system/bin/device_config set_sync_disabled_for_tests persistent; /system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
   - `adb`: `adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent; /system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
-&nbsp;
+
+## &nbsp;
 
 
 
-#### Re-enable device config sync.
+##### Re-enable device config sync
 
-  You should ideally enable syncing again before upgrading your android OS version. If you make sure to always enable it before updating and current config is stable, then this method may likely be safe, but who knows. I don't know if sync value is preserved during an OS update. If it is preserved and if you forgot to enable syncing before the update, and update gets in a boot loop due to some issue, then you may be stuck in it if it was due to bad config, since android won't be able to restore default config.
+Disabling device config sync may prevent android from recovering from crashes, boot loops and bad configs since it will prevent `RescueParty` and `RollbackManager` to restore default settings, check [Why device config may get reset?](#why-device-config-may-get-reset) section below for details. You should ideally **enable syncing again before upgrading your android OS version**. If you make sure to always enable it before updating and current config is stable, then disabling the config "should" likely be safe. I don't know if sync value is preserved during an OS update. If it is preserved and if you forgot to enable syncing before the update, and update gets in a boot loop due to some issue, then you may be stuck in it if it was due to bad config, since android won't be able to restore default config.
 
   - `root`: `su -c "/system/bin/device_config set_sync_disabled_for_tests none"`
   - `adb`: `adb shell "/system/bin/device_config set_sync_disabled_for_tests none"`
+
 &nbsp;
 
 
 
-#### Check if device config sync is currently disabled.
+##### Check if device config sync is currently disabled
 
-The following commands should return `true` if sync is disabled. Default value is `false`.
+Setting single values will still be allowed if state is disabled.
+
+###### Android 13+
+
+The following commands should return `persistent` if sync permanently disabled or `until_reboot` if disabled till next boot. Default value is `none`.
+
+  - `root`: `su -c "/system/bin/device_config get_sync_disabled_for_tests"`
+  - `adb`: `adb shell "/system/bin/device_config get_sync_disabled_for_tests"`
+
+
+###### Android 12
+
+The following commands should return `true` if sync is disabled permanently or till next boot. Default value is `false`.
 
   - `root`: `su -c "/system/bin/device_config is_sync_disabled_for_tests"`
   - `adb`: `adb shell "/system/bin/device_config is_sync_disabled_for_tests"`
+
 &nbsp;
 
 
 
-#### Check device config sync mode stored in settings.
+##### Check device config sync mode stored in settings
 
-The following commands should return `0` for `none`, `1` for `persistent` and `2` for `until_reboot`.
+The following commands should return `0` for `none`, `1` for `persistent` and also `0` for `until_reboot` since [actual value is stored in memory](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/SettingsProvider.java;l=1186) for it.
 
   - `root`: `su -c "/system/bin/settings get global device_config_sync_disabled"`
   - `adb`: `adb shell "/system/bin/settings get global device_config_sync_disabled"`
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
 
-### Why device config may get reset?
+## Why device config may get reset?
 
 So I wasn't sure what was causing the reset of device configs or if it was just by android design. The other settings namespaces, `system`, `secure` and `global` weren't reset, only `config` was.
 
@@ -494,7 +605,7 @@ The sync can be permanently disabled by running the `adb shell "/system/bin/devi
 
 The other modes are listed [here](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/core/java/android/provider/Settings.java;l=16182) and in `device_config` command help (`device_config -h`).
 
-The currently enforced value can be checked with `adb shell "/system/bin/device_config is_sync_disabled_for_tests"`. The current mode int can be checked with `adb shell "/system/bin/settings get global device_config_sync_disabled"`. It should return `0` for `none`, `1` for `persistent` and `2` for `until_reboot`.
+The currently enforced value can be checked with `adb shell "/system/bin/device_config is_sync_disabled_for_tests"`. The current mode int can be checked with `adb shell "/system/bin/settings get global device_config_sync_disabled"`. It should return `0` for `none`, `1` for `persistent` and also `0` for `until_reboot` since [actual value is stored in memory](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/SettingsProvider.java;l=1186) for it.
 
 I didn't know what was calling `DeviceConfig.setProperties()` at `BOOT_COMPLETED` event since this was likely what was being called since sync disabled check only exists only in this function (unless caller was manually checking sync mode first). It can be called by [`RescueParty.resetDeviceConfigForPackages()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/RescueParty.java;l=234) which is called by [`RollbackManager.commit()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/rollback/Rollback.java;l=610), but I didn't see any `logcat` entries or `"commitRollback id=`, logged by [`RollbackManagerServiceImpl.commitRollbackInternal()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/rollback/RollbackManagerServiceImpl.java;l=445). Only `RollbackManager: mRollbackLifetimeDurationInMillis=1209600000` is shown, which is logged by [`RollbackManagerServiceImpl.onBootCompleted()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/rollback/RollbackManagerServiceImpl.java;l=591).
 
@@ -558,7 +669,11 @@ However, if you don't want to take such risks, then keep sync enabled, and set t
 ```
 
 </details>
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 Note that `atzq.m(String str)` calls `atzo.c(str, hashMap)` which calls `DeviceConfig.setProperties(builder.build());`
@@ -728,26 +843,34 @@ public final class atzo {
 ```
 
 </details>
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### What are the risks with disabling phantom process killing?
+## What are the risks with disabling phantom process killing?
 
 Users may want to know if there are any risks in setting the value to `2147483647`. I don't see any in my limited view, specially considering that no max limit was defined by android devs during the commit, but they may not have considered someone setting a value this high. But then again, there was no limit in any previous android version, so only additional useless book keeping of phantom processing would just be occurring and battery drainage consistent with older android versions. If there is something I am missing, it would be great if someone pointed it out.
 
 You can also monitor battery usage of apps or their CPU usage with `root` or `adb` with `top -m 10` command, or monitor the processes created with `ps -efww` command. You can also check [`google's battery-historian`](https://github.com/google/battery-historian) for getting battery usage stats of devices.
 
 **Note that completely disabling phantom killing will allow apps going crazy with background processes to consume lot of battery and android should provide per app exemption instead, so that only specific apps can be exempted and phantom killing still applies to other apps.**
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How to manually trigger phantom process killing in Termux?
+## How to manually trigger phantom process killing in Termux?
 
 Install the termux apps from Github or F-Droid as per [installation instructions](https://github.com/termux/termux-app#installation). F-Droid direct link is https://f-droid.org/en/packages/com.termux. After installing the app, open it and let bootstrap installation to finish.
 
@@ -978,7 +1101,7 @@ I init    : Untracked pid 5737 received signal 9
 <details>
 <summary>App and  Device Info</summary>
 
-## Termux App Info
+### Termux App Info
 
 **APP_NAME**: `Termux`  
 **PACKAGE_NAME**: `com.termux`  
@@ -991,9 +1114,9 @@ I init    : Untracked pid 5737 received signal 9
 **SIGNING_CERTIFICATE_SHA256_DIGEST**: `B6DA01480EEFD5FBF2CD3771B8D1021EC791304BDD6C4BF41D3FAABAD48EE5E1`  
 ##
 
-## Device Info
+### Device Info
 
-### Software
+#### Software
 
 **OS_VERSION**: `5.10.43-android12-9-00031-g02d62d5cece1-ab7792588`  
 **SDK_INT**: `31`  
@@ -1008,7 +1131,7 @@ I init    : Untracked pid 5737 received signal 9
 **TYPE**: `userdebug`  
 **TAGS**: `dev-keys`  
 
-### Hardware
+#### Hardware
 
 **MANUFACTURER**: `Google`  
 **BRAND**: `google`  
@@ -1020,13 +1143,17 @@ I init    : Untracked pid 5737 received signal 9
 **SUPPORTED_ABIS**: `x86_64, arm64-v8a`  
 
 </details>
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### McAfee app gone crazy
+## McAfee app gone crazy
 
 Now, as per [OP's `dumpsys activity processes` log](https://github.com/termux/termux-app/issues/2366#issuecomment-955582861), the `com.wsandroid.suite`'s `logcat` processes were taking **ALL** `32` spots for max phantom processes and they all had [`oom adj=100`/`VISIBLE_APP_ADJ = 100`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ProcessList.java;l=248), which may or may not have been the same as the app process itself as used by `mTempPhantomProcesses` sorter. The termux process likely had [`PERCEPTIBLE_APP_ADJ = 200`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ProcessList.java;l=244) being a foreground service. Considering that it was `termux` `bash` that got killed, we know that the `com.wsandroid.suite` **app process** had lower oom ajd than termux app process and that is why recently started `bash` got killed and not the `logcat` ones running for almost `4hrs` (`knownSince=-3h57m28s448ms`). If termux had same oom adj as `com.wsandroid.suite`, then `bash` should have survived since it was younger than most `logcat` processes. The `bash` as per my current tests has `oom_score_adj=0` while termux is in background, buts its oom value is not considered.
 
@@ -1188,7 +1315,11 @@ ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)
   mForceBackgroundCheck=false
 ```
 </details>
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
@@ -1314,27 +1445,39 @@ $ adb shell "/system/bin/dumpsys activity processes | grep -E -A 50 'ProcessReco
 ```
 
 </details>
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 I also asked OP to check what `logcat` processes McAfee was actually running by running the command `adb shell "ps -efww | grep logcat"` and it reported that it was running fricking `135` `logcat` processes for the command: `logcat -v time -b main -b system -b events PackageManager:V ActivityManager:V SearchDialog:V AppSecurityPermissions:V MiniModeService:D *:S`. So many are running because OP set `max_phantom_processes` to `2147483647` and so they weren't being *culled* to default `32`. I emailed McAfee on `Oct, 31` at ` mmsfeedback@mcafee.com` but haven't received a "human" response. They definitely should fix this. [mcafee-logcat.txt](mcafee-logcat.txt)
-&nbsp;&nbsp;&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### The "unfair" advantage for foreground oriented apps
+## The "unfair" advantage for foreground oriented apps
 
 Note that popular apps that are by design foreground apps, like social media apps, browsers, etc will often have lower oom adj, [`FOREGROUND_APP_ADJ = 0`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ProcessList.java;l=258) or [`PERCEPTIBLE_RECENT_FOREGROUND_APP_ADJ = 50`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ProcessList.java;l=254) if they are being used or were recently used, and will **often** have "unfair" advantage over apps that do most of their work in background, like Tasker and for some users Termux as well, which with their foreground service notification will usually be at oom adj [`PERCEPTIBLE_APP_ADJ = 200`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ProcessList.java;l=244). **An app that mostly works in background does not mean its unimportant**. Moreover, an app like Termux doesn't have any need to bind to additional services and create connections and shouldn't suffer because of it. Apps may try to do that unnecessarily now just to increase their oom adj values.
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### Buggy and malicious apps
+## Buggy and malicious apps
 
 
 > I am pretty sure the app normally wouldn't need to run that many processes and is likely "leaking processes",
@@ -1344,13 +1487,17 @@ Thinking more on this, any malicious or buggy app could just spawn `> 32` proces
 Imagine, if some popular app like Google or Facebook app or any popular app from play store or a system app has leaking processes and is usually at a lower oom than other apps or is in foreground or last used while the *culling* of phantom processes gets scheduled, it would result in processes of other apps that may be far more important getting killed and being prevented from even be run for long, resulting in data loss. Others apps may just be trying to run a single process instead of `32`, but still get killed. Such apps would already have the "unfair advantage" and then waste even more spots in the `32` limit because of leaks. OEMs may set their own apps at lower oom adj too that also run phantom processes. The `com.google.android.gms` is normally at `100` oom adj too. How are app devs supposed to deal with that?
 
 Now, this can be abused by a malicious app as well deliberately, possibly by starting a foreground service and running lot of useless processes. *Culling* will kill processes of apps that may not have a foreground service and were just running a short command in a receiver or something. The malicious app may not gain much from this, unless somehow affects a system process, but still harms other normal apps.
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### Improvements in heuristics and exemptions for apps
+## Improvements in heuristics and exemptions for apps
 
 Neither trimming nor excessive CPU killing, nor empty process killing (including possibly daemon, like `sshd`, [termux-app/#2015](https://github.com/termux/termux-app/issues/2015), [termux-boot/#5](https://github.com/termux/termux-boot/issues/5#issuecomment-353601099)) should be done for apps that have **battery optimizations disabled**. A user explicitly granted an app the permission to "use battery", android shouldn't be killing its processes, unless under memory pressure, or at the very least shouldn't prioritize it. That should be like the whole point of disabling battery optimizations. Adding this to android OS should solve most of the concerns.
 
@@ -1359,7 +1506,10 @@ And if trimming needs to be done, the heuristics should improve. It should have 
 If I hadn't asked OP for the logs, we wouldn't have known that McAfee was causing so much trouble for other apps and who knows how long it has been doing it. And OP was actually capable of reporting and providing logs, but an average user wouldn't be, and from their perspective, their apps would just be getting killed because had knowingly or blindly installed a buggy app from playstore. And even if they reported (without logs), devs wouldn't be able to reproduce the issue on their device, since they wouldn't likely have a buggy app installed, so this kinda issues will be harder to solve for devs and will have nothing to do with their code. The OS should protect users from that, even without them having to check `logcat` and `dumpsys` output.
 
 Moreover, **total `32` processes limit of all apps combined is too low**. That can easily be hit during what one would consider normal conditions and not excessive. Just running `2-3` terminal sessions, each with optional terminal multiplexer (`tmux`) and then actually running some commands in them or just a script that divides work with background jobs (`command &`), plus some processes started incrementally as or for plugins, like `termux-api` or `termux-tasker` and you are easily looking at more than `15` to `30` processes for just Termux. Now add some user running some servers in Termux or add Tasker with its profiles and tasks, plus any other app, and `32` limit is hit instantly and processes getting trimmed, and some important work or data being lost.
-&nbsp;&nbsp;
+
+---
+
+&nbsp;
 
 
 
@@ -1370,11 +1520,11 @@ Moreover, **total `32` processes limit of all apps combined is too low**. That c
 
 
 
-## Cached and Empty Processes
+# Cached and Empty Processes
 
-Cached and empty processes are killed by [`OomAdjuster.updateAndTrimProcessLSP()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/OomAdjuster.java;l=1195) depending on whether their process state is [`PROCESS_STATE_CACHED_ACTIVITY`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/proto_logging/stats/enums/app/enums.proto;l=94) or [`PROCESS_STATE_CACHED_EMPTY`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/proto_logging/stats/enums/app/enums.proto;l=102). The difference between [cached](https://developer.android.com/guide/components/activities/process-lifecycle) and [empty](https://stuff.mit.edu/afs/sipb/project/android/docs/guide/components/processes-and-threads.html) processes is that cached processes are tied to a component of the app like an `Activity` and empty processes are not (like a `sshd` daemon).
+Cached and empty processes are killed by [`OomAdjuster.updateAndTrimProcessLSP()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/OomAdjuster.java;l=1195) depending on whether their process state is [`PROCESS_STATE_CACHED_ACTIVITY`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/core/java/android/app/ProcessStateEnum.aidl;l=83) or [`PROCESS_STATE_CACHED_EMPTY`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/core/java/android/app/ProcessStateEnum.aidl;l=94). The difference between [cached](https://developer.android.com/guide/components/activities/process-lifecycle) and [empty](https://stuff.mit.edu/afs/sipb/project/android/docs/guide/components/processes-and-threads.html) app processes is that cached processes are tied to a component of the app like an `Activity` and empty processes are not. Forked child (phantom) processes of app processes are not considered, but are killed along with the app process. An app process with a foreground service will not be considered as an empty process either.
 
-### Cache Settings
+## Cache Settings
 
 The amount of cached and empty processes that are killed or kept is based on `5` device config values.
 
@@ -1393,13 +1543,17 @@ The `CUR_MAX_CACHED_PROCESSES` value can be overridden by the first valid value 
 - The `mCustomizedMaxCachedProcesses` value which is loaded from android resources. It defaults to `32`.
 
 The `MAX_CACHED_PROCESSES` value is hard coded and cannot be updated and since `CUR_TRIM_EMPTY_PROCESSES` and `CUR_TRIM_CACHED_PROCESSES` are based on it, neither can they, as mentioned in [this comment](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=1162).
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### Why max limit for KILLING?
+## Why max limit for KILLING?
 
 Now, you may be wondering why this this (low) `CUR_MAX_CACHED_PROCESSES` limit is used by android. It's cause of **MUSIC!!!** Yes, cause of Music! It was added in the [`8633e68`](https://cs.android.com/android/_/android/platform/frameworks/base/+/8633e68ebdf215f721834f7aa16c2f3cef1bae86
 ) commit with the following message.
@@ -1419,13 +1573,17 @@ The commit defined the first value for `MAX_HIDDEN_APPS`/`CUR_MAX_CACHED_PROCESS
 // keeping around processes on devices with large amounts of RAM.
 static final int MAX_HIDDEN_APPS = 15;
 ```
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How are cached and empty processes killed?
+## How are cached and empty processes killed?
 
 The values for `CUR_*_PROCESSES` that are set are used by `OomAdjuster` in [`assignCachedAdjIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/OomAdjuster.java;l=1010) and [`updateAndTrimProcessLSP()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/OomAdjuster.java;l=1142) to decide how many least recently used (LRU) cached and empty processes to kill/keep. You can read the [android docs for `OomAdjuster`](https://android.googlesource.com/platform/frameworks/base/+/master/services/core/java/com/android/server/am/OomAdjuster.md) for more info.
 
@@ -1441,13 +1599,17 @@ The [`app.mLastActivityTime`](https://cs.android.com/android/platform/superproje
 - `Broadcast` [delivered](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/BroadcastQueue.java;l=308).
 - `ContentProvider` [connection created](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ContentProviderHelper.java;l=1360).
 - [`ProcessRecord` info is updated](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ProcessRecord.java;l=1240), which may be done when [activity is started or destroyed](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/wm/ActivityRecord.java;l=4890), by window process controller when [starting activity](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/wm/WindowProcessController.java;l=1168) or [updating process info](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/wm/WindowProcessController.java;l=1107), or by [activity task controller](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/wm/Task.java;l=6265).
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How to check cache settings?
+## How to check cache settings?
 
 #### Check `MAX_CACHED_PROCESSES` value used by `ActivityManagerConstants`.
 
@@ -1458,7 +1620,7 @@ The `dumpsys activity settings` command [dumps the `MAX_CACHED_PROCESSES`](https
 
 
 
-#### Check `max_phantom_processes` value stored in device config.
+#### Check `max_cached_processes` value stored in device config.
 
 The value returned by the command will be `null` by default if not set with `device_config put` command.
 
@@ -1472,15 +1634,19 @@ The value returned by the command will be `null` by default if not set with `dev
   - `root`: `su -c "/system/bin/dumpsys activity settings | grep -B 2 -A 5 mCustomizedMaxCachedProcesses"`
   - `adb`: `adb shell "/system/bin/dumpsys activity settings | grep -B 2 -A 5 mCustomizedMaxCachedProcesses"`
 
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### What are default cache settings?
+## What are default cache settings?
 
-#### ASOP
+### ASOP
 
 The default is `32` for `CUR_MAX_CACHED_PROCESSES` and `16` for `CUR_MAX_EMPTY_PROCESSES ` in android `12` AOSP and avd. The `CUR_MAX_CACHED_PROCESSES` value is set to `mCustomizedMaxCachedProcesses` since `max_cached_processes` value is `null` and `mOverrideMaxCachedProcesses` is `-1` ([not dumped if `< 0`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=1336)).
 
@@ -1527,7 +1693,7 @@ ActivityManager: Killing 2034:com.android.localtransport/1000 (adj 985): empty #
 
 
 
-#### Pixel Devices
+### Pixel Devices
 
 The default is `64` for `CUR_MAX_CACHED_PROCESSES` and `32` for `CUR_MAX_EMPTY_PROCESSES ` in android `12` pixel 3a and Pixel 5. The `CUR_MAX_CACHED_PROCESSES` value is set to `max_cached_processes` since its set and `mOverrideMaxCachedProcesses` is `-1` ([not dumped if `< 0`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=1336)).
 
@@ -1556,13 +1722,17 @@ ActivityManager: Killing 14312:com.google.android.apps.docs/u0a171 (adj 975): em
 ActivityManager: Killing 14286:com.google.android.documentsui/u0a66 (adj 975): empty #34
 ActivityManager: Killing 14513:com.google.android.apps.wallpaper/u0a197 (adj 995): empty for 1800s
 ```
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### How to increase amount of cached and empty processes kept?
+## How to increase amount of cached and empty processes kept?
 
 You can set a higher custom value for `max_cached_processes` device config, which will be set to `CUR_MAX_CACHED_PROCESSES` and whatever is passed, will be divided by `2` and set to `CUR_MAX_EMPTY_PROCESSES`.
 
@@ -1573,7 +1743,7 @@ Moreover, OEMs may have their own killers too, like [`OppoClearSystemService`](h
 
 To set a custom value for `max_cached_processes`, run something like following commands. Don't go too crazy and increase it too much [as advised by AOSP](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=529).
 
-#### Android `>= 10`
+### Android `>= 10`
 
 The `device_config` command was added in [android `10`](The-device-config-command) and for older versions these commands will not work.
 
@@ -1594,7 +1764,7 @@ adb shell "content call --uri content://settings/config --method DELETE_config -
 
 
 
-#### Android `8.0 - 9`
+### Android `8.0 - 9`
 
 Even though the `device_config` command did not exist in android `< 10` to store values in the `settings` `config` namespace, in android `8.0` support was added via [`0ef403e5`](https://cs.android.com/android/_/android/platform/frameworks/base/+/0ef403e53e2762d077750dd0a50b73c2125cadb0) for storing `max_cached_processes` and some other constants in the `settings` `global` namespace under a single `activity_manager_constants` key as a comma separated list of `key=value` pairs. This design is still used for some components, like `job_scheduler_quota_controller`, which you can check with `adb shell "settings get global job_scheduler_quota_controller_constants"`.
 
@@ -1605,13 +1775,17 @@ You can first get the default value with `adb shell "settings get global activit
 When the property will be updated, the [`ActivityManagerConstants.updateConstants()`](https://cs.android.com/android/platform/superproject/+/android-8.0.0_r51:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=240) function will get called, which will use [`KeyValueListParser(',')`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/core/java/android/util/KeyValueListParser.java) [`mParser`](https://cs.android.com/android/platform/superproject/+/android-8.0.0_r51:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=183) to read each value and update it.
 
 I haven't tested this since I only own an Android `7` device, which does not support this `max_cached_processes` and only has hardcoded values like [`ProcessList.MAX_CACHED_APPS`](https://cs.android.com/android/platform/superproject/+/android-7.0.0_r1:frameworks/base/services/core/java/com/android/server/am/ProcessList.java;l=147), nor do I need it since managing the `RAM` with `minfree` values and `swap` file works just fine for me and background child processes run for hours without getting killed.
-&nbsp;&nbsp;
+
+
+---
+
+&nbsp;
 
 
 
 
 
-### `device_config` command
+## `device_config` command
 
 The [`device_config`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/DeviceConfigService.java;l=270) command was added in android `10` via [`1278d1c7`](https://cs.android.com/android/_/android/platform/frameworks/base/+/1278d1c7363e211f706098f06c6c7c9d88a1c47d). It uses a separate `config` namespace in addition to the old `system`, `secure` and `global` namespaces controlled by `settings` command. They are all managed by android's [`Settings`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/core/java/android/provider/Settings.java;l=2393) and [`SettingsProvider`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/packages/SettingsProvider/src/com/android/providers/settings/SettingsProvider.java).
 
@@ -1660,11 +1834,11 @@ $ adb shell dumpsys package
 ```
 
 </details>
-&nbsp;&nbsp;
 
+&nbsp;
 
 <details>
-<summary>device_config command help</summary>
+<summary>device_config command help Android 12</summary>
 
 ```
 $ adb shell "/system/bin/device_config -h"
@@ -1695,22 +1869,50 @@ Device Config (device_config) commands:
 ```
 
 </details>
-&nbsp;&nbsp;
+
+&nbsp;
+
+<details>
+<summary>device_config command help Android 13</summary>
+
+```
+adb shell "/system/bin/device_config -h"
+Device Config (device_config) commands:
+  help
+      Print this help text.
+  get NAMESPACE KEY
+      Retrieve the current value of KEY from the given NAMESPACE.
+  put NAMESPACE KEY VALUE [default]
+      Change the contents of KEY to VALUE for the given NAMESPACE.
+      {default} to set as the default value.
+  delete NAMESPACE KEY
+      Delete the entry for KEY for the given NAMESPACE.
+  list [NAMESPACE]
+      Print all keys and values defined, optionally for the given NAMESPACE.
+  reset RESET_MODE [NAMESPACE]
+      Reset all flag values, optionally for a NAMESPACE, according to RESET_MODE.
+      RESET_MODE is one of {untrusted_defaults, untrusted_clear, trusted_defaults}
+      NAMESPACE limits which flags are reset if provided, otherwise all flags are reset
+  set_sync_disabled_for_tests SYNC_DISABLED_MODE
+      Modifies bulk property setting behavior for tests. When in one of the disabled modes this ensures that config isn't overwritten.
+      SYNC_DISABLED_MODE is one of:
+        none: Sync is not disabled. A reboot may be required to restart syncing.
+        persistent: Sync is disabled, this state will survive a reboot.
+        until_reboot: Sync is disabled until the next reboot.
+  get_sync_disabled_for_tests
+      Prints one of the SYNC_DISABLED_MODE values, see set_sync_disabled_for_tests
+```
+
+</details>
+
+---
+
+&nbsp;
 
 
 
 
 
-### Xeffyr's magical or broken device
-
-OP also notified that his Pixel 3a also has the build number `SP1A.210812.015`, so not sure why the processes are not being killed on xeffyr's device. Considering that xeffyr's device [is returning `32` for `max_phantom_processes=32`](https://github.com/termux/termux-app/issues/2366#issuecomment-955227443), that means, underneath the code does exist for `PhantomProcessList` since that key was added in the same commit [`15755084`](https://cs.android.com/android/_/android/platform/frameworks/base/+/157550849f0430181fa53c8e1b63112c59c6937b), although there were some patch commits later. Pixel November updates [have rolled out](https://www.xda-developers.com/november-2021-android-security-update/) with [`SP1A.211105.004 (android-12.0.0_r11)`](https://source.android.com/setup/start/build-numbers#source-code-tags-and-builds) for Pixel `5`, so killing might start occurring with it if there was some issues before.
-
-
-
-
-
-### PS
+## Credits
 
 A huge thanks to the OP @V-no-A who ran like a gazillion commands I kept sending him that made this write up possible. A huge thanks to @MishaalRahman as well for getting the news out by initiating the https://www.xda-developers.com/android-12-background-app-limitations-major-headache article and @Incipiens (AdamConwayIE) for testing and writing it up and for the credit as well.
-
-Pinging @joaomgcd who desperately wants me to write shorter comments, sorry to disappoint, a book it is ;)
