@@ -501,6 +501,8 @@ Note that on debug android builds, like android virtual device Google API's rele
 
 Trying to run `setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs` with `adb` will [fail due to selinux restrictions](settings_enable_monitor_phantom_procs-with-adb.png) since a [sepolicy excemption](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:system/sepolicy/private/shell.te;l=149) does not exist for it like it does for other flags like [`settings_dynamic_system`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:system/sepolicy/private/property_contexts;l=71) used for [dynamic system updates](https://source.android.com/docs/core/ota/dynamic-system-updates#feature-flag). The [`FeatureFlagUtils.isEnabled()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/core/java/android/util/FeatureFlagUtils.java;l=94) gives priority to `settings` `global` value over `persist.sys.fflag`. Check https://twitter.com/MishaalRahman/status/1491487491026833413 and https://twitter.com/MishaalRahman/status/1491489385170227205
 
+If you are currently using Termux app [github builds](https://github.com/termux/termux-app#github), you can open termux app and open left drawer -> `Settings icon` -> `About` and it should show the current value of `MONITOR_PHANTOM_PROCS` under `Software` info section on `Android 12+` devices and will be marked `<unsupported>` if its not supported in current android build. It should also show in next F-Droid release `v0.119.0`.
+
 &nbsp;
 
 
@@ -537,6 +539,10 @@ Disable device config sync permanently and set `max_phantom_processes` to `21474
 
   - `root`: `su -c "/system/bin/device_config set_sync_disabled_for_tests persistent; /system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
   - `adb`: `adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent; /system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
+
+&nbsp;
+
+If you are currently using Termux app [github builds](https://github.com/termux/termux-app#github), you can open termux app and open left drawer -> `Settings icon` -> `About` and it should show the current value of `MAX_PHANTOM_PROCESSES` and `DEVICE_CONFIG_SYNC_DISABLED` under `Software` info section if termux has been granted `DUMP` and `PACKAGE_USAGE_STATS` permissions with `pm grant com.termux android.permission.DUMP; appops set --user 0 com.termux GET_USAGE_STATS allow` with `adb`/`root`. It should also show in next F-Droid release `v0.119.0`.
 
 ## &nbsp;
 
