@@ -488,6 +488,9 @@ push_messaging_over_quota_behavior=0
 
 ## Commands to disable phantom process killing and TLDR
 
+**Note:** Termux also supplies the [`android-tool`](https://github.com/termux/termux-packages/blob/master/packages/android-tools/build.sh) package that comes with the `adb` binary which you can use to run `adb` commands directly in termux app after you have set up `adb` wireless mode and connect to it. To install the package, run `pkg install android-tools`. Turning on `adb` wireless mode directly from device itself can only normally be done on Android `11` devices, to turn it on for lower Android versions requires connecting to a pc and running the `adb tcpip 5555` command on every boot. Check [Connect to a device over Wi-Fi (Android 11+)](https://developer.android.com/studio/command-line/adb#connect-to-a-device-over-wi-fi-android-11+) and [Connect to a device over Wi-Fi (Android 10 and lower)](https://developer.android.com/studio/command-line/adb#wireless) android docs for more info. Some more info in the [reddit announcement post](https://www.reddit.com/r/termux/comments/mmu2iu/announce_adb_is_now_packaged_for_termux/
+).
+
 ### Android 12L, 13 and higher
 
 **Run commands once** to disable killing of **phantom processes** and **processes using excessive cpu**.
@@ -1802,7 +1805,7 @@ The various `protectionLevel` values are listed in the documentation [here](http
 
 The `WRITE_DEVICE_CONFIG` permission by default is granted to `android` core, `com.google.android.gsf` (google services framework), `com.google.android.gms` (google play services) and `com.android.shell` (package for `shell` user, used for commands run with `adb`).
 
-Note that Termux also supplies the [`android-tool`](https://github.com/termux/termux-packages/blob/master/packages/android-tools/build.sh) package that comes with the `adb` binary which you can use to run `adb` commands directly in termux app after you have set up `adb` wireless mode and connect to it. Check [android docs](https://developer.android.com/studio/command-line/adb#connect-to-a-device-over-wi-fi-android-11+) for more info. Some more info in the [reddit announcement post](https://www.reddit.com/r/termux/comments/mmu2iu/announce_adb_is_now_packaged_for_termux/
+**Note:** Termux also supplies the [`android-tool`](https://github.com/termux/termux-packages/blob/master/packages/android-tools/build.sh) package that comes with the `adb` binary which you can use to run `adb` commands directly in termux app after you have set up `adb` wireless mode and connect to it. To install the package, run `pkg install android-tools`. Turning on `adb` wireless mode directly from device itself can only normally be done on Android `11` devices, to turn it on for lower Android versions requires connecting to a pc and running the `adb tcpip 5555` command on every boot. Check [Connect to a device over Wi-Fi (Android 11+)](https://developer.android.com/studio/command-line/adb#connect-to-a-device-over-wi-fi-android-11+) and [Connect to a device over Wi-Fi (Android 10 and lower)](https://developer.android.com/studio/command-line/adb#wireless) android docs for more info. Some more info in the [reddit announcement post](https://www.reddit.com/r/termux/comments/mmu2iu/announce_adb_is_now_packaged_for_termux/
 ).
 
 <details>
