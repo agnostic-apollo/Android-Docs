@@ -40,7 +40,7 @@ Google was asked for an option to disable such killing and a **huge thanks to Ji
   - [How are cached and empty processes killed?](#how-are-cached-and-empty-processes-killed)
   - [How to check cache settings?](#how-to-check-cache-settings)
   - [What are default cache settings?](#what-are-default-cache-settings)
-    - [ASOP](#ASOP)
+    - [AOSP](#AOSP)
     - [Pixel Devices](#Pixel-Devices)
   - [How to increase amount of cached and empty processes kept?](#how-to-increase-amount-of-cached-and-empty-processes-kept)
 - [`device_config` command](#device_config-command)
@@ -1655,7 +1655,7 @@ The value returned by the command will be `null` by default if not set with `dev
 
 ## What are default cache settings?
 
-### ASOP
+### AOSP
 
 The default is `32` for `CUR_MAX_CACHED_PROCESSES` and `16` for `CUR_MAX_EMPTY_PROCESSES ` in android `12` AOSP and avd. The `CUR_MAX_CACHED_PROCESSES` value is set to `mCustomizedMaxCachedProcesses` since `max_cached_processes` value is `null` and `mOverrideMaxCachedProcesses` is `-1` ([not dumped if `< 0`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=1336)).
 
