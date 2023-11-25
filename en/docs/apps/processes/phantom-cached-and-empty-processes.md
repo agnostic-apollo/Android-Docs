@@ -527,6 +527,10 @@ You can also run the following command to disable killing of phantom processes a
 
 For Android `>= 14`, if you cannot setup `adb`/`root`, but can keep `Developer options` enabled at all times, then follow the instructions in [Commands for Android 14 and higher](#commands-for-android-14-and-higher) section instead.
 
+To revert changes for commands above and re-enable killing of phantom processes, run `settings delete global settings_enable_monitor_phantom_procs` or `setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs ''` depending on command run previously.
+
+To get current value of `*settings_enable_monitor_phantom_procs`, run `settings get global settings_enable_monitor_phantom_procs` or `getprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs`.
+
 Note that on debug android builds, like android virtual device Google API's releases, the setting can also be changed from `Android Settings` -> `System` -> `Developer Options` -> `Feature flags`. **On production devices, the `Feature flags` page will be empty.**
 
 &nbsp;
@@ -562,6 +566,9 @@ Just set `max_phantom_processes` to `2147483647` to permanently disable killing 
   - `adb`: `adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
   - Tasker `Adb Wifi` or `Run Shell` action with `Use Root` toogle enabled: `/system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
 
+To revert changes for commands above and re-enable killing of phantom processes, run `/system/bin/device_config delete activity_manager max_phantom_processes`. You will get `Failed to delete` error if value is not already set.
+
+To get current value of `max_phantom_processes`, run `/system/bin/device_config get activity_manager max_phantom_processes`.
 
 #### If gms or related services do exist on the device
 
@@ -571,6 +578,10 @@ Disable device config sync permanently and set `max_phantom_processes` to `21474
 
   - `root`: `su -c "/system/bin/device_config set_sync_disabled_for_tests persistent; /system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
   - `adb`: `adb shell "/system/bin/device_config set_sync_disabled_for_tests persistent; /system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
+
+To revert changes for commands above and re-enable killing of phantom processes, run `/system/bin/device_config set_sync_disabled_for_tests none; /system/bin/device_config delete activity_manager max_phantom_processes`. You will get `Failed to delete` error if value is not already set.
+
+To get current value of `max_phantom_processes`, run `/system/bin/device_config get activity_manager max_phantom_processes`.
 
 &nbsp;
 
