@@ -444,9 +444,21 @@ So based on `battery power changes`, one can trigger the *culling* by connecting
 
 ## How to disable the phantom processes killing?
 
-### Android 12L, 13 and higher
+### Internal details for Android 14 and higher
 
-As per `settings_enable_monitor_phantom_procs` settings flag added in [`09dcdad`](https://cs.android.com/android/_/android/platform/frameworks/base/+/09dcdad5ebc159861920f090e07da60fac71ac0a), the [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=424) does not kill any **phantom processes** and [`ActivityManagerService.checkExcessivePowerUsage()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java;l=14281) does not kill any **processes using excessive cpu** if [`FeatureFlagUtils.SETTINGS_ENABLE_MONITOR_PHANTOM_PROCS`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/core/java/android/util/FeatureFlagUtils.java;l=58) is disabled, i.e its value is `false`.
+As per `persist.sys.fflag.override.settings_enable_monitor_phantom_procs` settings flag toggle added in [`03d398b`](https://cs.android.com/android/_/android/platform/frameworks/base/+/03d398b27121e12a3187ab535176c3c0d42e7358) and [`249283ff`](https://cs.android.com/android/_/android/platform/packages/apps/Settings/+/249283ffa0d82bfdc1c1445e5c336fbdb659de90), the [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-14.0.0_r1:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=424) does not kill any **extra phantom processes `> 32`** and [`ActivityManagerService.checkExcessivePowerUsage()`](https://cs.android.com/android/platform/superproject/+/android-14.0.0_r1:frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java;l=16117) does not kill any **processes using excessive cpu** if [`FeatureFlagUtils.SETTINGS_ENABLE_MONITOR_PHANTOM_PROCS`](https://cs.android.com/android/_/android/platform/frameworks/base/+/refs/tags/android-14.0.0_r1:core/java/android/util/FeatureFlagUtils.java;l=68) is disabled, i.e its value is `false`.
+
+The settings flag value can be changed from `Android Settings` -> `System` -> `Developer options` -> `Disable child process restrictions` toggle as it triggers [`PhantomProcessPreferenceController.onPreferenceChange()`](https://cs.android.com/android/_/android/platform/packages/apps/Settings/+/refs/tags/android-14.0.0_r1:src/com/android/settings/development/PhantomProcessPreferenceController.java;l=55), which calls [`FeatureFlagUtils.setEnabled()`](https://cs.android.com/android/_/android/platform/frameworks/base/+/refs/tags/android-14.0.0_r1:core/java/android/util/FeatureFlagUtils.java;l=299). The flag value will revert to its default value `true` if `Developer options` are disabled, as [`PhantomProcessPreferenceController.onDeveloperOptionsSwitchDisabled()`](https://cs.android.com/android/_/android/platform/packages/apps/Settings/+/refs/tags/android-14.0.0_r1:src/com/android/settings/development/PhantomProcessPreferenceController.java;l=76) will get called to set it to `true` again.
+
+Check [Commands to disable phantom process killing and TLDR](#commands-to-disable-phantom-process-killing-and-tldr) section below for the instructions to disable the flag.
+
+&nbsp;
+
+
+
+### Internal details for Android 12L, 13 and higher
+
+As per `settings_enable_monitor_phantom_procs` settings flag added in [`09dcdad`](https://cs.android.com/android/_/android/platform/frameworks/base/+/09dcdad5ebc159861920f090e07da60fac71ac0a), the [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=424) does not kill any **extra phantom processes `> 32`** and [`ActivityManagerService.checkExcessivePowerUsage()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java;l=14281) does not kill any **processes using excessive cpu** if [`FeatureFlagUtils.SETTINGS_ENABLE_MONITOR_PHANTOM_PROCS`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/core/java/android/util/FeatureFlagUtils.java;l=58) is disabled, i.e its value is `false`.
 
 Check [Commands to disable phantom process killing and TLDR](#commands-to-disable-phantom-process-killing-and-tldr) section below for the command to disable the flag.
 
@@ -454,11 +466,11 @@ Check [Commands to disable phantom process killing and TLDR](#commands-to-disabl
 
 
 
-### Android 12
+### Internal details for Android 12
 
 On Android 12, **no setting exists** that can be changed with `adb` or `root` to disable killing of **processes using excessive cpu**.
 
-However, the killing of **phantom processes** can be disabled. The [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=416) uses the [`max_phantom_processes`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=172) setting for the [`activity_manager`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/core/java/android/provider/DeviceConfig.java;l=67) namespace to decide how many processes to kill, which as mentioned defaults to `32`.
+However, the killing of **extra phantom processes `> 32`** can be disabled. The [`PhantomProcessList.trimPhantomProcessesIfNecessary()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/PhantomProcessList.java;l=416) uses the [`max_phantom_processes`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerConstants.java;l=172) setting for the [`activity_manager`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/core/java/android/provider/DeviceConfig.java;l=67) namespace to decide how many processes to kill, which as mentioned defaults to `32`.
 
 Based on the `trimPhantomProcessesIfNecessary()` `for` loop in source code, the `max_phantom_processes` value can be set to [`Integer.MAX_VALUE` (`2147483647`)](https://docs.oracle.com/javase/7/docs/api/java/lang/Integer.html#MAX_VALUE) to disable the killing of phantom processes, since the outer `if (mService.mConstants.MAX_PHANTOM_PROCESSES < mPhantomProcesses.size())` condition will always fail.
 
@@ -491,18 +503,35 @@ push_messaging_over_quota_behavior=0
 **Note:** Termux also supplies the [`android-tool`](https://github.com/termux/termux-packages/blob/master/packages/android-tools/build.sh) package that comes with the `adb` binary which you can use to run `adb` commands directly in termux app after you have set up `adb` wireless mode and connect to it. To install the package, run `pkg install android-tools`. Turning on `adb` wireless mode directly from device itself can only normally be done on Android `11` devices, to turn it on for lower Android versions requires connecting to a pc and running the `adb tcpip 5555` command on every boot. Check [Connect to a device over Wi-Fi (Android 11+)](https://developer.android.com/studio/command-line/adb#connect-to-a-device-over-wi-fi-android-11+) and [Connect to a device over Wi-Fi (Android 10 and lower)](https://developer.android.com/studio/command-line/adb#wireless) android docs for more info. Some more info in the [reddit announcement post](https://www.reddit.com/r/termux/comments/mmu2iu/announce_adb_is_now_packaged_for_termux/
 ).
 
-### Android 12L, 13 and higher
+### Commands for Android 14 and higher
 
-**Run commands once** to disable killing of **phantom processes** and **processes using excessive cpu**.
+**Enable toggle once** at `Android Settings` -> `System` -> `Developer options` -> `Disable child process restrictions` to disable killing of **extra phantom processes `> 32`** and **processes using excessive cpu**. You will need to enable `Developer options` first on your device for it to show in `System` settings page, and it can usually be done by tapping `Android Settings` -> `About` -> `Build number` field `7` times.
 
-  - `root`: `su -c "settings put global settings_enable_monitor_phantom_procs false"` or `su -c "setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs false"`
+**If you disable `Developer options` again, then `Disable child process restrictions` toggle will be disabled again automatically and killing of phantom processes will be enabled again.** If you cannot keep `Developer options` enabled at all times and can setup `adb`/`root`, then follow the instructions in [Commands for Android 12L, 13 and higher](#commands-for-android-12l-13-and-higher) section instead.
+
+You can also run the following command to disable killing of phantom processes as this is the setting that is set by the toggle, and its `bool` value is opposite of the toggle state. However, this is not recommended as it will revert to its default value `true` if `Developer options` are disabled. The `settings_enable_monitor_phantom_procs` value in `global` settings namespace will not be reverted that is mentioned in [Commands for Android 12L, 13 and higher](#commands-for-android-12l-13-and-higher) section, so use that instead if you want to control setting with a command.
+
+  - `root`: `su -c "setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs false"`
+
+&nbsp;
+
+
+
+### Commands for Android 12L, 13 and higher
+
+**Run commands once** to disable killing of **extra phantom processes `> 32`** and **processes using excessive cpu**.
+
+  - `root`: `su -c "settings put global settings_enable_monitor_phantom_procs false"`
   - `adb`: `adb shell "settings put global settings_enable_monitor_phantom_procs false"`
+  - `root`: `su -c "setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs false"` (Not recommended as it will revert to its default value `true` if `Developer options` are disabled on Android `>= 14`)
+
+For Android `>= 14`, if you cannot setup `adb`/`root`, but can keep `Developer options` enabled at all times, then follow the instructions in [Commands for Android 14 and higher](#commands-for-android-14-and-higher) section instead.
 
 Note that on debug android builds, like android virtual device Google API's releases, the setting can also be changed from `Android Settings` -> `System` -> `Developer Options` -> `Feature flags`. **On production devices, the `Feature flags` page will be empty.**
 
 &nbsp;
 
-Trying to run `setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs` with `adb` will [fail due to selinux restrictions](settings_enable_monitor_phantom_procs-with-adb.png) since a [sepolicy excemption](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:system/sepolicy/private/shell.te;l=149) does not exist for it like it does for other flags like [`settings_dynamic_system`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:system/sepolicy/private/property_contexts;l=71) used for [dynamic system updates](https://source.android.com/docs/core/ota/dynamic-system-updates#feature-flag). The [`FeatureFlagUtils.isEnabled()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/core/java/android/util/FeatureFlagUtils.java;l=94) gives priority to `settings` `global` value over `persist.sys.fflag`. Check https://twitter.com/MishaalRahman/status/1491487491026833413 and https://twitter.com/MishaalRahman/status/1491489385170227205
+Trying to run `setprop persist.sys.fflag.override.settings_enable_monitor_phantom_procs` with `adb` will [fail due to selinux restrictions](settings_enable_monitor_phantom_procs-with-adb.png) since a [sepolicy exemption](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:system/sepolicy/private/shell.te;l=149) does not exist for it like it does for other flags like [`settings_dynamic_system`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:system/sepolicy/private/property_contexts;l=71) used for [dynamic system updates](https://source.android.com/docs/core/ota/dynamic-system-updates#feature-flag). The [`FeatureFlagUtils.isEnabled()`](https://cs.android.com/android/platform/superproject/+/android-12.1.0_r5:frameworks/base/core/java/android/util/FeatureFlagUtils.java;l=94) gives priority to `settings` `global` value over `persist.sys.fflag`. Check https://twitter.com/MishaalRahman/status/1491487491026833413 and https://twitter.com/MishaalRahman/status/1491489385170227205
 
 If you are currently using Termux app [github builds](https://github.com/termux/termux-app#github), you can open termux app and open left drawer -> `Settings icon` -> `About` and it should show the current value of `MONITOR_PHANTOM_PROCS` under `Software` info section on `Android 12+` devices and will be marked `<unsupported>` if its not supported in current android build. It should also show in next F-Droid release `v0.119.0`.
 
@@ -510,11 +539,11 @@ If you are currently using Termux app [github builds](https://github.com/termux/
 
 
 
-### Android 12
+### Commands for Android 12
 
 On Android 12, **no setting exists** that can be changed with `adb` or `root` to disable killing of **processes using excessive cpu** and users will have to manually limit the cpu usage of forked processes using commands like [`nice`/`cpulimit`](https://unix.stackexchange.com/questions/151883/limiting-processes-to-not-exceed-more-than-10-of-cpu-usage). A [xposed module](https://github.com/rovo89/XposedBridge/wiki/Development-tutorial) for **rooted users** that can be run with [`Magisk`](https://github.com/topjohnwu/Magisk) and [`LSPosed`](https://github.com/LSPosed/LSPosed) that hooks into [`ActivityManagerService.checkExcessivePowerUsage()`](https://cs.android.com/android/platform/superproject/+/android-12.0.0_r4:frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java;l=14237) to disable the killing is planned to be created.
 
-To disable killing of **phantom processes**, read on.
+To disable killing of **extra phantom processes `> 32`**, read on.
 
 If you have `com.google.android.gms` (google play services) installed on your device as system app, then it will overwrite all your config settings remotely on your device after `3-4` mins have passed after device boot up and screen unlocked and whenever gms config update comes, which may happen at any time of the day/week/month. To prevent that from happening you **must disable disable device config sync**, otherwise value will randomly reset and all excess phantom processes will immediately be killed.
 
@@ -527,7 +556,7 @@ You can check if `gms` is installed on your device and has the permission to ove
 
 #### If gms or related services do not exist on the device
 
-Just set `max_phantom_processes` to `2147483647` to permanently disable killing of **phantom processes**.
+Just set `max_phantom_processes` to `2147483647` to permanently disable killing of **extra phantom processes `> 32`**.
 
   - `root`: `su -c "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
   - `adb`: `adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"`
@@ -536,7 +565,7 @@ Just set `max_phantom_processes` to `2147483647` to permanently disable killing 
 
 #### If gms or related services do exist on the device
 
-Disable device config sync permanently and set `max_phantom_processes` to `2147483647` to permanently disable killing of **phantom processes**.
+Disable device config sync permanently and set `max_phantom_processes` to `2147483647` to permanently disable killing of **extra phantom processes `> 32`**.
 
 **Use this at your own risk** and if you are willing to accept any known and unknown risks, like no recovery from boot loops, crashes and bad config values. Check `*device config sync*` and [Why device config may get reset?](#why-device-config-may-get-reset) sections below for more info. You can also run `/system/bin/device_config set_sync_disabled_for_tests until_reboot` to disable sync until next reboot, in which case you will need to run the commands on every reboot since `gms` will reset the config at boot.
 
