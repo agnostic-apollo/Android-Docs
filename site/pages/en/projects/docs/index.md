@@ -5,6 +5,7 @@ Welcome to documentation for random stuff related to the [Android](https://www.a
 ### Contents
 
 - [Apps](apps/index.md)
+- [OS](os/index.md)
 
 ---
 
