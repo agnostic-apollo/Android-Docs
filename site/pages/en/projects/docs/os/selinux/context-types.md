@@ -45,7 +45,9 @@ The common process context types are listed below.
 - [`isolated_app`](#isolated_app)
 - [`ephemeral_app`](#ephemeral_app)
 - [`sdk_sandbox`](#sdk_sandbox)
+- [`runas_app`](#runas_app)
 - [`su`](#su)
+- [`ksu`](#ksu)
 - [`magisk`](#magisk)
 - [`shell`](#shell)
 
@@ -225,6 +227,19 @@ The process context type assigned to Google Play services (`com.google.android.g
 
 
 
+### `runas_app`
+
+The process context type assigned to app processes running inside the `run-as` command from ADB or root shell.
+
+- https://cs.android.com/android/platform/superproject/+/android-13.0.0_r18:system/core/run-as/run-as.cpp
+- https://cs.android.com/android/platform/superproject/+/android-13.0.0_r18:system/sepolicy/private/seapp_contexts;l=177
+- https://cs.android.com/android/platform/superproject/+/android-13.0.0_r18:system/sepolicy/public/runas_app.te;l=1
+- https://cs.android.com/android/platform/superproject/+/android-13.0.0_r18:system/sepolicy/private/runas_app.te
+
+## &nbsp;
+
+
+
 ### `su`
 
 The process context type assigned to `root` (`0`) user processes by AOSP, like for `adb root`. The process context always equals `u:r:su:s0` without any [categories](security-context.md#categories).
@@ -232,6 +247,17 @@ The process context type assigned to `root` (`0`) user processes by AOSP, like f
 - https://cs.android.com/android/platform/superproject/+/android-14.0.0_r1:system/sepolicy/private/su.te
 - https://cs.android.com/android/platform/superproject/+/android-14.0.0_r1:system/core/rootdir/init.usb.rc;l=15
 - https://cs.android.com/android/platform/superproject/+/android-14.0.0_r1:system/sepolicy/private/init.te;l=32
+
+## &nbsp;
+
+
+
+### `ksu`
+
+The process context type assigned to `root` (`0`) user processes by [KernelSU](https://github.com/tiann/KernelSU), like for `su` commands. The process context always equals `u:r:ksu:s0` without any [categories](security-context.md#categories).
+
+- https://github.com/tiann/KernelSU/blob/v3.2.5/manager/app/src/main/java/me/weishu/kernelsu/Natives.kt#L29
+- https://github.com/tiann/KernelSU/blob/v3.2.5/website/docs/guide/app-profile.md#selinux
 
 ## &nbsp;
 
